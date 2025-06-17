@@ -23,14 +23,17 @@ app = FastAPI(title="StockAI Backend", description="Backend for stock management
 # Configuración CORS para production
 allowed_origins = [
     "http://localhost:3000",  # Desarrollo local
-    "https://*.vercel.app",   # Todas las URLs de Vercel
-    "https://stockai*.vercel.app",  # Tu dominio específico
+    "https://tustockai-seven.vercel.app",  # Tu dominio específico de Vercel
+    "https://*.vercel.app",   # Todas las URLs de Vercel (fallback)
+    "https://stockai*.vercel.app",  # Patrones de stockai
 ]
 
 # Permitir dominio personalizado de Vercel si está configurado
 vercel_url = os.getenv("VERCEL_URL")
 if vercel_url:
     allowed_origins.append(f"https://{vercel_url}")
+
+print(f"🔧 CORS configured for origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
