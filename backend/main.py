@@ -21,12 +21,16 @@ load_dotenv()
 app = FastAPI(title="StockAI Backend", description="Backend for stock management with OCR capabilities", version="1.0.0")
 
 # Configuración CORS para production
-allowed_origins = ["*"]  # Por defecto permitir todo para desarrollo
-if os.getenv("VERCEL_DOMAIN"):
-    allowed_origins = [
-        f"https://{os.getenv('VERCEL_DOMAIN')}",
-        "http://localhost:3000"  # Para desarrollo local
-    ]
+allowed_origins = [
+    "http://localhost:3000",  # Desarrollo local
+    "https://*.vercel.app",   # Todas las URLs de Vercel
+    "https://stockai*.vercel.app",  # Tu dominio específico
+]
+
+# Permitir dominio personalizado de Vercel si está configurado
+vercel_url = os.getenv("VERCEL_URL")
+if vercel_url:
+    allowed_origins.append(f"https://{vercel_url}")
 
 app.add_middleware(
     CORSMiddleware,
