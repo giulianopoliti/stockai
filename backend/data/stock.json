@@ -2,13 +2,13 @@
   {
     "id": 1,
     "nombre": "TWISTOS MINIT JAMON 95GX30X1",
-    "stock": 4,
+    "stock": 24,
     "stock_minimo": 5,
     "precio_base": 1493.96,
     "categoria": "Nuevo",
     "codigo": "AUTO001",
     "proveedor_id": 1,
-    "ultima_actualizacion": "2025-06-17T02:44:26.389005"
+    "ultima_actualizacion": "2025-06-17T14:34:47.185478"
   },
   {
     "id": 2,
@@ -46,23 +46,23 @@
   {
     "id": 5,
     "nombre": "SMIRNOFF BC. GRAPEF&LIMA LATA 4X6",
-    "stock": 2,
+    "stock": 14,
     "stock_minimo": 5,
     "precio_base": 2300.0,
     "categoria": "Nuevo",
     "codigo": "AUTO005",
     "proveedor_id": 1,
-    "ultima_actualizacion": "2025-06-17T02:45:50.109037"
+    "ultima_actualizacion": "2025-06-17T15:58:27.822602"
   },
   {
     "id": 6,
     "nombre": "SMIRNOFF BC. RUBYORANG&LIME LATA",
-    "stock": 2,
+    "stock": 4,
     "stock_minimo": 5,
     "precio_base": 2300.0,
     "categoria": "Nuevo",
     "codigo": "AUTO006",
     "proveedor_id": 1,
-    "ultima_actualizacion": "2025-06-17T02:45:50.109621"
+    "ultima_actualizacion": "2025-06-17T15:58:27.822602"
   }
 ]

@@ -62,8 +62,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <Package className="h-5 w-5" />
           </div>
           <div className="grid flex-1 text-left leading-tight">
-            <span className="truncate font-bold text-slate-800">Sistema Stock</span>
-            <span className="truncate text-xs text-slate-600">Gestión Comercial</span>
+            <span className="truncate font-bold text-slate-800">Stock.AI</span>
+            <span className="truncate text-xs text-slate-600">Punto de venta inteligente</span>
           </div>
         </div>
       </SidebarHeader>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import boto3
@@ -12,6 +12,8 @@ import openai
 from dotenv import load_dotenv
 import re
 from datetime import datetime
+import tempfile
+import shutil
 
 # Cargar variables de entorno
 load_dotenv()
@@ -398,30 +400,41 @@ def procesar_texto_fallback(texto: str) -> List[ProductDetected]:
 
 class TextInput(BaseModel):
     texto: str
+    productos_actuales: List[dict] = []
 
 @app.post("/process-text")
 async def process_text(input_data: TextInput):
     """
-    Procesa texto libre para detectar productos y cantidades usando OpenAI
+    Procesa texto libre para detectar productos y cantidades usando matching inteligente con OpenAI
     """
     try:
+        # Cargar productos actuales del stock si no se proporcionaron
+        productos_actuales = input_data.productos_actuales
+        if not productos_actuales:
+            stock_actual = cargar_stock()
+            productos_actuales = [producto.model_dump() for producto in stock_actual]
+        
         # Detectar proveedor en el texto
         proveedor_detectado = detectar_proveedor(input_data.texto)
-        productos_detectados = await procesar_factura_especifica(input_data.texto)
+        
+        # Procesar con matching inteligente usando OpenAI
+        resultado_matching = await procesar_texto_con_matching_inteligente(
+            input_data.texto, 
+            productos_actuales
+        )
         
         # Calcular impuestos para productos con precio
         productos_con_impuestos = []
         subtotal = 0
         
-        for producto in productos_detectados:
-            if producto.precio_sin_impuestos:
+        for producto_info in resultado_matching["productos"]:
+            if producto_info.get("precio_sin_impuestos"):
                 impuesto_porcentaje = proveedor_detectado.impuesto if proveedor_detectado else 21
-                precio_con_impuestos = producto.precio_sin_impuestos * (1 + impuesto_porcentaje / 100)
-                
-                producto.precio_con_impuestos = round(precio_con_impuestos, 2)
-                subtotal += producto.precio_sin_impuestos * producto.cantidad
+                precio_con_impuestos = producto_info["precio_sin_impuestos"] * (1 + impuesto_porcentaje / 100)
+                producto_info["precio_con_impuestos"] = round(precio_con_impuestos, 2)
+                subtotal += producto_info["precio_sin_impuestos"] * producto_info["cantidad"]
             
-            productos_con_impuestos.append(producto)
+            productos_con_impuestos.append(producto_info)
         
         # Calcular resumen si hay precios
         resumen = None
@@ -440,12 +453,405 @@ async def process_text(input_data: TextInput):
             "productos": productos_con_impuestos,
             "proveedor": proveedor_detectado,
             "resumen": resumen,
+            "analisis_ia": resultado_matching.get("analisis_ia", ""),
             "texto_procesado": input_data.texto,
             "success": True
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error procesando el texto: {str(e)}")
+
+@app.post("/process-audio")
+async def process_audio(file: UploadFile = File(...), productos_actuales: str = Form("[]")):
+    """
+    Procesa un archivo de audio, lo transcribe con Whisper y luego hace matching inteligente
+    """
+    try:
+        # Validar tipo de archivo
+        audio_types = ['audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/mp4', 'audio/webm', 'audio/flac']
+        if file.content_type not in audio_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Tipo de archivo no soportado. Use: {', '.join(audio_types)}"
+            )
+        
+        # Validar tamaño (máximo 25MB como límite de Whisper)
+        file_size = 0
+        content = await file.read()
+        file_size = len(content)
+        
+        if file_size > 25 * 1024 * 1024:  # 25MB
+            raise HTTPException(status_code=400, detail="El archivo es muy grande (máximo 25MB)")
+        
+        # Verificar si OpenAI está configurado
+        if not openai_client:
+            raise HTTPException(
+                status_code=503, 
+                detail="OpenAI Whisper no está configurado. Configure OPENAI_API_KEY."
+            )
+        
+        # Parsear productos actuales
+        try:
+            productos_actuales_list = json.loads(productos_actuales) if productos_actuales != "[]" else []
+        except json.JSONDecodeError:
+            productos_actuales_list = []
+        
+        # Cargar productos actuales del stock si no se proporcionaron
+        if not productos_actuales_list:
+            stock_actual = cargar_stock()
+            productos_actuales_list = [producto.model_dump() for producto in stock_actual]
+        
+        # Crear archivo temporal para Whisper
+        temp_file = None
+        try:
+            # Crear archivo temporal con la extensión correcta
+            file_extension = ".mp3"  # Default
+            if file.content_type == "audio/wav":
+                file_extension = ".wav"
+            elif file.content_type == "audio/m4a":
+                file_extension = ".m4a"
+            elif file.content_type == "audio/webm":
+                file_extension = ".webm"
+            elif file.content_type == "audio/flac":
+                file_extension = ".flac"
+            
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
+            temp_file.write(content)
+            temp_file.close()
+            
+            # Validar duración mínima del archivo (al menos 1 segundo)
+            file_stats = os.stat(temp_file.name)
+            if file_stats.st_size < 1000:  # Menos de 1KB probablemente es muy corto
+                raise HTTPException(
+                    status_code=400,
+                    detail="El audio es muy corto. Grabe al menos 1-2 segundos."
+                )
+            
+            # Transcribir con Whisper
+            with open(temp_file.name, "rb") as audio_file:
+                transcript = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="es",  # Especificar español para mejor precisión
+                    prompt="Productos, inventario, stock, mercadería, llegaron, entraron, salieron"  # Ayudar con el contexto
+                )
+            
+            texto_transcrito = transcript.text.strip()
+            print(f"Audio transcrito: '{texto_transcrito}'")
+            
+            # Validaciones más estrictas para texto transcrito
+            if not texto_transcrito:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="No se detectó ningún audio o el audio está en silencio"
+                )
+            
+            # Verificar que el texto tenga contenido real (no solo ruido)
+            if len(texto_transcrito) < 5:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El audio transcrito es muy corto. Hable más claramente."
+                )
+            
+            # Detectar si el texto parece ser ruido o sin sentido
+            palabras = texto_transcrito.split()
+            if len(palabras) < 2:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se pudieron detectar palabras claras en el audio"
+                )
+            
+            # Verificar que hay al menos algunas palabras relacionadas con inventario
+            palabras_clave_inventario = [
+                'producto', 'productos', 'llegaron', 'llegó', 'entraron', 'entró', 
+                'salieron', 'salió', 'stock', 'inventario', 'mercadería', 'mercaderia',
+                'cantidad', 'unidades', 'cajas', 'latas', 'botellas', 'paquetes',
+                'twistos', 'smirnoff', 'coca', 'sprite', 'yogur', 'leche', 'pan'
+            ]
+            
+            texto_lower = texto_transcrito.lower()
+            tiene_contexto_inventario = any(palabra in texto_lower for palabra in palabras_clave_inventario)
+            
+            if not tiene_contexto_inventario and len(palabras) < 4:
+                print(f"Texto sin contexto de inventario: '{texto_transcrito}'")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El audio no parece contener información sobre productos o inventario. Texto detectado: '{texto_transcrito}'"
+                )
+            
+            # Detectar proveedor en el texto
+            proveedor_detectado = detectar_proveedor(texto_transcrito)
+            
+            # Procesar con matching inteligente usando OpenAI
+            resultado_matching = await procesar_texto_con_matching_inteligente(
+                texto_transcrito, 
+                productos_actuales_list
+            )
+            
+            # Calcular impuestos para productos con precio
+            productos_con_impuestos = []
+            subtotal = 0
+            
+            for producto_info in resultado_matching["productos"]:
+                if producto_info.get("precio_sin_impuestos"):
+                    impuesto_porcentaje = proveedor_detectado.impuesto if proveedor_detectado else 21
+                    precio_con_impuestos = producto_info["precio_sin_impuestos"] * (1 + impuesto_porcentaje / 100)
+                    producto_info["precio_con_impuestos"] = round(precio_con_impuestos, 2)
+                    subtotal += producto_info["precio_sin_impuestos"] * producto_info["cantidad"]
+                
+                productos_con_impuestos.append(producto_info)
+            
+            # Calcular resumen si hay precios
+            resumen = None
+            if subtotal > 0:
+                impuesto_porcentaje = proveedor_detectado.impuesto if proveedor_detectado else 21
+                impuestos_total = subtotal * (impuesto_porcentaje / 100)
+                total = subtotal + impuestos_total
+                
+                resumen = ResumenFactura(
+                    subtotal=round(subtotal, 2),
+                    impuestos=round(impuestos_total, 2),
+                    total=round(total, 2)
+                )
+            
+            # Agregar información sobre la transcripción al análisis
+            analisis_completo = f"🎙️ Transcripción de audio: \"{texto_transcrito}\"\n\n{resultado_matching.get('analisis_ia', '')}"
+            
+            return {
+                "productos": productos_con_impuestos,
+                "proveedor": proveedor_detectado,
+                "resumen": resumen,
+                "analisis_ia": analisis_completo,
+                "texto_transcrito": texto_transcrito,
+                "texto_procesado": texto_transcrito,  # Para compatibilidad
+                "success": True
+            }
+            
+        finally:
+            # Limpiar archivo temporal
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+                
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        print(f"Error procesando audio: {e}")
+        raise HTTPException(status_code=500, detail=f"Error procesando el audio: {str(e)}")
+
+async def procesar_texto_con_matching_inteligente(texto: str, productos_actuales: List[dict]) -> dict:
+    """
+    Usa OpenAI para analizar el texto y hacer matching inteligente con productos existentes
+    """
+    # Validación previa del texto
+    if not texto or len(texto.strip()) < 3:
+        return {
+            "productos": [],
+            "analisis_ia": "Error: El texto está vacío o es muy corto para procesar."
+        }
+    
+    # Si OpenAI no está configurado, usar fallback
+    if not openai_client:
+        print("OpenAI no configurado, usando procesamiento fallback para matching")
+        return procesar_matching_fallback(texto, productos_actuales)
+    
+    try:
+        # Preparar lista de productos para el prompt
+        productos_inventario = []
+        for producto in productos_actuales:
+            productos_inventario.append(f"ID: {producto.get('id', 'N/A')} - {producto.get('nombre', 'Sin nombre')} - ${producto.get('precio_base', 0)} - Stock: {producto.get('stock', 0)}")
+        
+        productos_texto = '\n'.join(productos_inventario[:50])  # Limitar para no exceder tokens
+        
+        prompt = f"""
+Eres un asistente experto en gestión de inventarios. Analiza el texto de entrada de mercadería y haz matching inteligente con los productos existentes.
+
+TEXTO DE ENTRADA:
+{texto}
+
+INVENTARIO ACTUAL:
+{productos_texto}
+
+INSTRUCCIONES:
+1. Analiza el texto para identificar:
+   - QUE productos llegaron
+   - CANTIDADES exactas
+   - PROVEEDOR/DISTRIBUIDORA mencionada
+   - PRECIOS si se mencionan
+   - ACCIÓN (entrada/salida)
+
+2. Para cada producto detectado:
+   - Si coincide con un producto existente: usar el ID y nombre exacto del inventario
+   - Si es un producto nuevo: marcarlo como "es_nuevo": true
+   - Calcular nivel de confianza del matching
+
+3. EJEMPLOS DE MATCHING:
+   - Texto: "10 latas de smirnoff manzana" → Buscar productos similares a "Smirnoff", "bebida", "lata", "manzana"
+   - Texto: "llegaron fideos" → Buscar "Fideos", "pasta", productos similares
+   - Texto: "5 coca cola" → Buscar "Coca", "Coca-Cola", "gaseosa"
+
+4. DETECCIÓN DE PROVEEDOR:
+   - Buscar nombres de distribuidoras/proveedores en el texto
+   - Ejemplo: "HiH Distribuciones", "Distribuidora Norte", etc.
+
+FORMATO DE RESPUESTA (JSON):
+{{
+    "productos": [
+        {{
+            "nombre": "Nombre del producto (del inventario si hay match, sino el detectado)",
+            "cantidad": numero_entero,
+            "precio_sin_impuestos": precio_unitario_o_null,
+            "accion": "entrada" o "salida",  
+            "confianza": porcentaje_0_a_100,
+            "es_nuevo": true_o_false,
+            "producto_id": id_del_producto_existente_o_null
+        }}
+    ],
+    "analisis_ia": "Explicación detallada de lo que detectaste y cómo hiciste el matching"
+}}
+
+REGLAS IMPORTANTES:
+- SOLO procesa texto que claramente mencione productos o inventario
+- SI el texto no tiene sentido o no menciona productos, devuelve lista vacía
+- NO inventes productos que no se mencionan claramente
+- Sé generoso con el matching SOLO si hay productos realmente mencionados
+- Si no estás seguro de qué producto es, indica menor confianza
+- La explicación debe ser clara sobre las decisiones tomadas
+- Si detectas un proveedor, menciónalo en el análisis
+
+EJEMPLO DE TEXTOS QUE NO DEBES PROCESAR:
+- Ruido sin sentido: "hmm ah eh ok"
+- Texto irrelevante: "hola como estas"
+- Audio de fondo sin productos mencionados
+
+Responde SOLO con el JSON válido:
+"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un experto en matching de productos de inventario. Tu trabajo es ser inteligente y flexible para encontrar coincidencias, incluso con nombres similares o sinónimos. Respondes únicamente con JSON válido."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=2000
+        )
+        
+        # Extraer y parsear la respuesta
+        content = response.choices[0].message.content.strip()
+        
+        # Limpiar la respuesta si tiene marcadores de código
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        print(f"Respuesta de OpenAI para matching: {content}")
+        
+        # Parsear JSON
+        result = json.loads(content)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error en OpenAI para matching: {e}")
+        # Fallback a procesamiento básico
+        return procesar_matching_fallback(texto, productos_actuales)
+
+def procesar_matching_fallback(texto: str, productos_actuales: List[dict]) -> dict:
+    """
+    Procesamiento fallback para matching cuando OpenAI no está disponible
+    """
+    productos_detectados = []
+    texto_lower = texto.lower()
+    
+    # Validación previa - no procesar texto sin sentido
+    if len(texto.strip()) < 5:
+        return {
+            "productos": [],
+            "analisis_ia": f"Análisis fallback: El texto '{texto}' es muy corto para procesar."
+        }
+    
+    # Verificar que el texto tenga al menos una palabra relacionada con inventario
+    palabras_inventario = [
+        'producto', 'productos', 'llegaron', 'llegó', 'entraron', 'entró', 
+        'salieron', 'salió', 'stock', 'inventario', 'mercadería', 'mercaderia',
+        'cantidad', 'unidades', 'cajas', 'latas', 'botellas', 'paquetes'
+    ]
+    
+    tiene_contexto = any(palabra in texto_lower for palabra in palabras_inventario)
+    if not tiene_contexto:
+        return {
+            "productos": [],
+            "analisis_ia": f"Análisis fallback: El texto '{texto}' no parece contener información sobre productos o inventario."
+        }
+    
+    # Palabras clave para detectar productos comunes
+    palabras_clave = {
+        "twistos": ["twistos", "twisted", "snack"],
+        "smirnoff": ["smirnoff", "smirn", "vodka", "lata"],
+        "jamon": ["jamon", "jamón"],
+        "queso": ["queso"],
+        "grapefruit": ["grapef", "pomelo", "toronja"],
+        "lima": ["lima", "lime"],
+        "naranja": ["orang", "naranja"],
+        "coca": ["coca", "cola"],
+        "sprite": ["sprite"],
+        "fanta": ["fanta"],
+        "yogur": ["yogur", "yogurt"],
+        "leche": ["leche"],
+        "pan": ["pan", "lactal"],
+        "fideos": ["fideos", "pasta", "macarrones"],
+        "agua": ["agua"],
+        "cerveza": ["cerveza", "quilmes", "brahma"]
+    }
+    
+    # Buscar coincidencias
+    for producto_actual in productos_actuales:
+        nombre_actual = producto_actual.get('nombre', '').lower()
+        
+        # Buscar coincidencias directas por palabras clave
+        for palabra_base, variantes in palabras_clave.items():
+            if any(variante in texto_lower for variante in variantes):
+                # Verificar si la palabra clave está en el nombre del producto
+                if palabra_base in nombre_actual or any(variante in nombre_actual for variante in variantes):
+                    # Extraer cantidad del texto
+                    numeros = re.findall(r'\d+', texto)
+                    cantidad = int(numeros[0]) if numeros else 1
+                    
+                    productos_detectados.append({
+                        "nombre": producto_actual.get('nombre'),
+                        "cantidad": cantidad,
+                        "precio_sin_impuestos": producto_actual.get('precio_base'),
+                        "accion": "entrada",
+                        "confianza": 85,
+                        "es_nuevo": False,
+                        "producto_id": producto_actual.get('id')
+                    })
+                    break
+        
+        # Si ya encontramos un producto, no seguir buscando
+        if productos_detectados:
+            break
+    
+    # Si no se encontró nada, crear producto genérico
+    if not productos_detectados:
+        numeros = re.findall(r'\d+', texto)
+        cantidad = int(numeros[0]) if numeros else 1
+        
+        productos_detectados.append({
+            "nombre": "Producto detectado",
+            "cantidad": cantidad,
+            "precio_sin_impuestos": None,
+            "accion": "entrada", 
+            "confianza": 60,
+            "es_nuevo": True,
+            "producto_id": None
+        })
+    
+    return {
+        "productos": productos_detectados,
+        "analisis_ia": f"Análisis fallback: Procesé el texto '{texto}' y encontré {len(productos_detectados)} coincidencias usando patrones básicos."
+    }
 
 async def procesar_factura_especifica(texto_factura: str) -> List[ProductDetected]:
     """
