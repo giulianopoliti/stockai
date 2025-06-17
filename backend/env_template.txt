@@ -1,0 +1,24 @@
+# ========================================
+# StockAI Backend Configuration
+# ========================================
+
+# AWS Configuration (Required for real OCR)
+# Get these from AWS IAM Console: https://console.aws.amazon.com/iam/
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+
+# OpenAI Configuration (Required for intelligent text processing)
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=
+
+# Backend Configuration (Optional)
+BACKEND_PORT=8000
+FRONTEND_URL=http://localhost:3000
+
+# ========================================
+# Setup Instructions:
+# 1. Copy this content to a file named .env
+# 2. Fill in your AWS and OpenAI credentials
+# 3. Save the file in the backend/ directory
+# ======================================== 

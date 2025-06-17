@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "nombre": "SMALL TASTES",
+    "impuesto": 21,
+    "telefono": "011-4567-8901",
+    "cuit": "20-12345678-9",
+    "email": "ventas@smalltastes.com.ar",
+    "direccion": "Av. Corrientes 1234, CABA"
+  },
+  {
+    "id": 2,
+    "nombre": "HIF HIH DistriDuciones",
+    "impuesto": 32,
+    "telefono": "2267403230",
+    "cuit": "33-71167678-9",
+    "email": "hyfdistribucion@gmail.com",
+    "direccion": "Av. Victor Hugo y Colectora 3, Buenos Aires"
+  },
+  {
+    "id": 3,
+    "nombre": "Coca-Cola FEMSA",
+    "impuesto": 21,
+    "telefono": "0800-222-2652",
+    "cuit": "30-50000000-1",
+    "email": "distribuidores@coca-cola.com",
+    "direccion": "Parque Industrial Norte"
+  },
+  {
+    "id": 4,
+    "nombre": "Distribuidora Central",
+    "impuesto": 25,
+    "telefono": "011-5555-1234",
+    "cuit": "33-11111111-9",
+    "email": "info@distcentral.com.ar",
+    "direccion": "Av. San Martín 5678, Quilmes"
+  }
+] 
