@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Mic, Scan, Trash2, Plus, Minus, MicOff, Calculator } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Package, ShoppingCart, Users, AlertTriangle, Brain, Camera } from "lucide-react"
 
 // Productos disponibles (simulando base de datos)
 const productosDisponibles = [
@@ -27,371 +29,227 @@ interface ProductoVenta {
   subtotal: number
 }
 
-export default function VentasPage() {
-  const [ventaActual, setVentaActual] = useState<ProductoVenta[]>([])
-  const [codigoInput, setCodigoInput] = useState("")
-  const [textoInput, setTextoInput] = useState("")
-  const [total, setTotal] = useState(0)
-  const [isRecording, setIsRecording] = useState(false)
-  const [showVariosModal, setShowVariosModal] = useState(false)
-  const [variosData, setVariosData] = useState({ descripcion: "", cantidad: 1, precio: 0 })
-
-  // Simular escáner de código de barras
-  const escanearProducto = (codigo: string) => {
-    const producto = productosDisponibles.find((p) => p.codigo === codigo)
-    if (producto) {
-      agregarProducto(producto)
-      setCodigoInput("")
-    }
-  }
-
-  // Agregar producto a la venta
-  const agregarProducto = (producto: any, cantidad = 1) => {
-    const productoExistente = ventaActual.find((p) => p.id === producto.id)
-
-    if (productoExistente) {
-      const nuevaVenta = ventaActual.map((p) =>
-        p.id === producto.id
-          ? { ...p, cantidad: p.cantidad + cantidad, subtotal: (p.cantidad + cantidad) * p.precio }
-          : p,
-      )
-      setVentaActual(nuevaVenta)
-    } else {
-      const nuevoProducto: ProductoVenta = {
-        id: producto.id,
-        nombre: producto.nombre,
-        precio: producto.precio,
-        cantidad: cantidad,
-        subtotal: producto.precio * cantidad,
-      }
-      setVentaActual([...ventaActual, nuevoProducto])
-    }
-
-    calcularTotal()
-  }
-
-  // Procesar texto con IA (simulado)
-  const procesarTexto = (texto: string) => {
-    if (!texto.trim()) return
-
-    const textoLower = texto.toLowerCase()
-
-    if (textoLower.includes("coca") || textoLower.includes("gaseosa")) {
-      const cantidad = extraerCantidad(texto)
-      const producto = productosDisponibles.find((p) => p.nombre.toLowerCase().includes("coca"))
-      if (producto) agregarProducto(producto, cantidad)
-    }
-
-    if (textoLower.includes("pan")) {
-      const cantidad = extraerCantidad(texto)
-      const producto = productosDisponibles.find((p) => p.nombre.toLowerCase().includes("pan"))
-      if (producto) agregarProducto(producto, cantidad)
-    }
-
-    setTextoInput("")
-  }
-
-  const extraerCantidad = (texto: string): number => {
-    const numeros = texto.match(/\d+/)
-    return numeros ? Number.parseInt(numeros[0]) : 1
-  }
-
-  const modificarCantidad = (id: number, nuevaCantidad: number) => {
-    if (nuevaCantidad <= 0) {
-      eliminarProducto(id)
-      return
-    }
-
-    const nuevaVenta = ventaActual.map((p) =>
-      p.id === id ? { ...p, cantidad: nuevaCantidad, subtotal: nuevaCantidad * p.precio } : p,
-    )
-    setVentaActual(nuevaVenta)
-    calcularTotal()
-  }
-
-  const eliminarProducto = (id: number) => {
-    setVentaActual(ventaActual.filter((p) => p.id !== id))
-    calcularTotal()
-  }
-
-  const calcularTotal = () => {
-    const nuevoTotal = ventaActual.reduce((sum, producto) => sum + producto.subtotal, 0)
-    setTotal(nuevoTotal)
-  }
-
-  const confirmarVenta = () => {
-    if (ventaActual.length === 0) return
-
-    alert(`Venta confirmada por $${total.toLocaleString()}`)
-    setVentaActual([])
-    setTotal(0)
-  }
-
-  const limpiarVenta = () => {
-    setVentaActual([])
-    setTotal(0)
-  }
-
-  const toggleRecording = () => {
-    setIsRecording(!isRecording)
-    // Aquí iría la lógica real de grabación
-    if (!isRecording) {
-      setTimeout(() => {
-        setIsRecording(false)
-        // Simular resultado de speech-to-text
-        procesarTexto("2 cocas de 2 litros")
-      }, 3000)
-    }
-  }
-
-  const agregarVarios = () => {
-    if (variosData.descripcion && variosData.precio > 0) {
-      const nuevoProducto: ProductoVenta = {
-        id: Date.now(), // ID temporal
-        nombre: variosData.descripcion,
-        precio: variosData.precio,
-        cantidad: variosData.cantidad,
-        subtotal: variosData.precio * variosData.cantidad,
-      }
-      setVentaActual([...ventaActual, nuevoProducto])
-      setShowVariosModal(false)
-      setVariosData({ descripcion: "", cantidad: 1, precio: 0 })
-      calcularTotal()
-    }
-  }
-
-  React.useEffect(() => {
-    calcularTotal()
-  }, [ventaActual])
-
+const Index = () => {
   return (
-    <SidebarInset>
-      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 glass-card border-0 border-b border-white/20">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4 bg-white/20" />
+    <SidebarInset className="min-h-screen">
+      <header className="glass-header flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <div className="flex items-center gap-2 px-6">
+          <SidebarTrigger className="-ml-1 hover:glass-button transition-all duration-300 text-gray-300 hover:text-white" suppressHydrationWarning />
+          <Separator orientation="vertical" className="mr-2 h-4 bg-white/10" />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage className="font-semibold">Punto de Venta</BreadcrumbPage>
+                <BreadcrumbPage className="text-gray-300 font-medium">Dashboard</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </div>
       </header>
 
-      <div className="flex flex-1 gap-6 p-6">
-        {/* Panel izquierdo - Controles compactos */}
-        <div className="w-80 space-y-4">
-          {/* Escáner */}
-          <div className="glass-card rounded-2xl p-4 smooth-transition">
-            <div className="flex items-center gap-2 mb-3">
-              <Scan className="h-4 w-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-700">Escáner</span>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Código de barras"
-                value={codigoInput}
-                onChange={(e) => setCodigoInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && escanearProducto(codigoInput)}
-                className="glass-input border-0 text-sm h-9"
-              />
-              <Button onClick={() => escanearProducto(codigoInput)} size="sm" className="glass-button border-0 px-3">
-                <Scan className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Entrada por voz/texto */}
-          <div className="glass-card rounded-2xl p-4 smooth-transition">
-            <div className="flex items-center gap-2 mb-3">
-              <Mic className="h-4 w-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-700">Entrada rápida</span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ej: 2 cocas"
-                  value={textoInput}
-                  onChange={(e) => setTextoInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && procesarTexto(textoInput)}
-                  className="glass-input border-0 text-sm h-9"
-                />
-                <Button onClick={() => procesarTexto(textoInput)} size="sm" className="glass-button border-0 px-3">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button
-                onClick={toggleRecording}
-                variant="outline"
-                size="sm"
-                className={`w-full glass-button border-0 h-9 ${isRecording ? "recording bg-red-500/20 text-red-600" : ""}`}
-              >
-                {isRecording ? <MicOff className="h-4 w-4 mr-2" /> : <Mic className="h-4 w-4 mr-2" />}
-                {isRecording ? "Grabando..." : "Grabar"}
-              </Button>
-            </div>
+      <div className="flex-1 space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gradient mb-2">¡Bienvenido a Stock.AI!</h1>
+            <p className="text-gray-400 text-lg">Tu sistema de gestión inteligente con IA</p>
           </div>
         </div>
 
-        {/* Panel derecho - Venta actual (más grande) */}
-        <div className="flex-1 space-y-4">
-          <div className="glass-card rounded-2xl p-6 h-full smooth-transition">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Venta Actual</h2>
-              <Button variant="outline" size="sm" onClick={limpiarVenta} className="glass-button border-0">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Limpiar
-              </Button>
-            </div>
-
-            {ventaActual.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-                <Scan className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg font-medium">No hay productos en la venta</p>
-                <p className="text-sm">Escanea un código o usa entrada de texto</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="glass-card hover-lift group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Total de Productos</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-lg group-hover:from-blue-500/30 group-hover:to-cyan-500/30 transition-all duration-300 border border-blue-500/20">
+                <Package className="h-4 w-4 text-blue-400" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                  {ventaActual.map((producto) => (
-                    <div
-                      key={producto.id}
-                      className="flex items-center justify-between p-4 glass-card rounded-xl smooth-transition hover:scale-[1.02]"
-                    >
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-800">{producto.nombre}</div>
-                        <div className="text-sm text-slate-600">${producto.precio} c/u</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => modificarCantidad(producto.id, producto.cantidad - 1)}
-                            className="glass-button border-0 w-8 h-8 p-0"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center font-medium text-slate-800">{producto.cantidad}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => modificarCantidad(producto.id, producto.cantidad + 1)}
-                            className="glass-button border-0 w-8 h-8 p-0"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <div className="w-20 text-right font-bold text-slate-800">
-                          ${producto.subtotal.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gradient">1,234</div>
+              <p className="text-xs text-emerald-400 font-medium">+2.1% desde el mes pasado</p>
+            </CardContent>
+          </Card>
 
-                <Separator className="bg-white/30" />
-
-                <div className="flex justify-between items-center text-2xl font-bold text-slate-800 py-4">
-                  <span>Total:</span>
-                  <span className="text-green-600">${total.toLocaleString()}</span>
-                </div>
+          <Card className="glass-card hover-lift group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Ventas del Día</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-xl rounded-lg group-hover:from-emerald-500/30 group-hover:to-teal-500/30 transition-all duration-300 border border-emerald-500/20">
+                <ShoppingCart className="h-4 w-4 text-emerald-400" />
               </div>
-            )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gradient">$45,231</div>
+              <p className="text-xs text-emerald-400 font-medium">+12.5% desde ayer</p>
+            </CardContent>
+          </Card>
 
-            {/* Botones de acción */}
-            <div className="flex gap-3 mt-6">
-              <Button
-                onClick={() => setShowVariosModal(true)}
-                variant="outline"
-                className="glass-button border-0 flex-1 h-12"
-              >
-                <Calculator className="h-4 w-4 mr-2" />
-                VARIOS
-              </Button>
-              <Button
-                onClick={confirmarVenta}
-                disabled={ventaActual.length === 0}
-                className="flex-1 h-12 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 font-semibold text-lg"
-              >
-                Confirmar Venta
-              </Button>
-            </div>
-          </div>
+          <Card className="glass-card hover-lift group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Proveedores Activos</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-xl rounded-lg group-hover:from-violet-500/30 group-hover:to-purple-500/30 transition-all duration-300 border border-violet-500/20">
+                <Users className="h-4 w-4 text-violet-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gradient">42</div>
+              <p className="text-xs text-emerald-400 font-medium">+3 nuevos este mes</p>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card hover-lift group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Stock Crítico</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-red-500/20 to-pink-500/20 backdrop-blur-xl rounded-lg group-hover:from-red-500/30 group-hover:to-pink-500/30 transition-all duration-300 border border-red-500/20">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gradient">23</div>
+              <p className="text-xs text-red-400 font-medium">Requieren atención</p>
+            </CardContent>
+          </Card>
         </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="glass-card hover-lift">
+            <CardHeader>
+              <CardTitle className="text-gradient flex items-center gap-2">
+                <Brain className="h-5 w-5 text-blue-400" />
+                Funciones IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 glass rounded-xl border border-cyan-500/20 hover-glow group">
+                <h3 className="font-semibold text-gradient-primary flex items-center gap-2 mb-3">
+                  <Camera className="h-4 w-4" />
+                  Procesamiento de Facturas
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Arrastra fotos de facturas y la IA extrae automáticamente productos, cantidades y precios.
+                </p>
+              </div>
+              
+              <div className="p-4 glass rounded-xl border border-violet-500/20 hover-glow group">
+                <h3 className="font-semibold text-gradient-accent flex items-center gap-2 mb-3">
+                  <Mic className="h-4 w-4" />
+                  Entrada por Voz
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Graba audios como "llegaron 10 Smirnoff" y el sistema actualiza el inventario automáticamente.
+                </p>
+              </div>
+
+              <div className="p-4 glass rounded-xl border border-emerald-500/20 hover-glow group">
+                <h3 className="font-semibold text-emerald-300 flex items-center gap-2 mb-3">
+                  <Scan className="h-4 w-4" />
+                  Matching Inteligente
+                </h3>
+                <p className="text-sm text-gray-400">
+                  La IA identifica productos automáticamente comparando con tu inventario actual.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card hover-lift">
+            <CardHeader>
+              <CardTitle className="text-gradient">Accesos Rápidos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <a 
+                href="/stock" 
+                className="flex items-center gap-3 p-4 glass rounded-xl hover:glass-button transition-all duration-300 group hover-glow"
+              >
+                <div className="p-2 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-lg group-hover:from-blue-500/30 group-hover:to-cyan-500/30 transition-all duration-300 border border-blue-500/20">
+                  <Package className="h-5 w-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white group-hover:text-gradient-primary transition-all">Gestión de Stock</h3>
+                  <p className="text-sm text-gray-400">Actualiza inventario con IA</p>
+                </div>
+              </a>
+              
+              <a 
+                href="/pedidos" 
+                className="flex items-center gap-3 p-4 glass rounded-xl hover:glass-button transition-all duration-300 group hover-glow"
+              >
+                <div className="p-2 bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-xl rounded-lg group-hover:from-green-500/30 group-hover:to-emerald-500/30 transition-all duration-300 border border-green-500/20">
+                  <ShoppingCart className="h-5 w-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white group-hover:text-green-300 transition-all">Gestión de Pedidos</h3>
+                  <p className="text-sm text-gray-400">Administra órdenes y entregas</p>
+                </div>
+              </a>
+              
+              <a 
+                href="/stock-critico" 
+                className="flex items-center gap-3 p-4 glass rounded-xl hover:glass-button transition-all duration-300 group hover-glow"
+              >
+                <div className="p-2 bg-gradient-to-br from-red-500/20 to-pink-500/20 backdrop-blur-xl rounded-lg group-hover:from-red-500/30 group-hover:to-pink-500/30 transition-all duration-300 border border-red-500/20">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white group-hover:text-red-300 transition-all">Stock Crítico</h3>
+                  <p className="text-sm text-gray-400">Productos con stock bajo</p>
+                </div>
+              </a>
+
+              <a 
+                href="/proveedores" 
+                className="flex items-center gap-3 p-4 glass rounded-xl hover:glass-button transition-all duration-300 group hover-glow"
+              >
+                <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-xl rounded-lg group-hover:from-violet-500/30 group-hover:to-purple-500/30 transition-all duration-300 border border-violet-500/20">
+                  <Users className="h-5 w-5 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white group-hover:text-violet-300 transition-all">Proveedores</h3>
+                  <p className="text-sm text-gray-400">Gestiona distribuidoras</p>
+                </div>
+              </a>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="glass-card hover-lift">
+          <CardHeader>
+            <CardTitle className="text-gradient">¿Cómo funciona Stock.AI?</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center space-y-3">
+                <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-xl w-16 h-16 flex items-center justify-center mx-auto border border-blue-500/20">
+                  <span className="text-2xl font-bold text-gradient-primary">1</span>
+                </div>
+                <h3 className="font-semibold text-white">Entrada de Datos</h3>
+                <p className="text-sm text-gray-400">
+                  Escribe, graba audio o sube fotos de facturas. La IA procesa cualquier formato.
+                </p>
+              </div>
+              
+              <div className="text-center space-y-3">
+                <div className="p-3 bg-gradient-to-br from-violet-500/20 to-purple-500/20 backdrop-blur-xl rounded-xl w-16 h-16 flex items-center justify-center mx-auto border border-violet-500/20">
+                  <span className="text-2xl font-bold text-gradient-accent">2</span>
+                </div>
+                <h3 className="font-semibold text-white">Análisis Inteligente</h3>
+                <p className="text-sm text-gray-400">
+                  OpenAI analiza el contenido y hace matching automático con tu inventario existente.
+                </p>
+              </div>
+              
+              <div className="text-center space-y-3">
+                <div className="p-3 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-xl rounded-xl w-16 h-16 flex items-center justify-center mx-auto border border-emerald-500/20">
+                  <span className="text-2xl font-bold text-emerald-300">3</span>
+                </div>
+                <h3 className="font-semibold text-white">Actualización Automática</h3>
+                <p className="text-sm text-gray-400">
+                  Confirma los cambios y el stock se actualiza instantáneamente con precios e impuestos.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Modal VARIOS */}
-      <Dialog open={showVariosModal} onOpenChange={setShowVariosModal}>
-        <DialogContent className="glass-card border-0 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-800">Agregar Producto Varios</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Descripción</label>
-              <Input
-                placeholder="Ej: Producto sin código"
-                value={variosData.descripcion}
-                onChange={(e) => setVariosData({ ...variosData, descripcion: e.target.value })}
-                className="glass-input border-0"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">Cantidad</label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={variosData.cantidad}
-                  onChange={(e) => setVariosData({ ...variosData, cantidad: Number.parseInt(e.target.value) || 1 })}
-                  className="glass-input border-0"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">Precio unitario</label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={variosData.precio || ""}
-                  onChange={(e) => setVariosData({ ...variosData, precio: Number.parseFloat(e.target.value) || 0 })}
-                  className="glass-input border-0"
-                />
-              </div>
-            </div>
-
-            {variosData.precio > 0 && variosData.cantidad > 0 && (
-              <div className="glass-card rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">Subtotal:</span>
-                  <span className="font-bold text-lg text-slate-800">
-                    ${(variosData.precio * variosData.cantidad).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVariosModal(false)} className="glass-button border-0">
-              Cancelar
-            </Button>
-            <Button
-              onClick={agregarVarios}
-              disabled={!variosData.descripcion || variosData.precio <= 0}
-              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-0"
-            >
-              Agregar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SidebarInset>
-  )
-}
+  );
+};
+
+export default Index;

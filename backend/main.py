@@ -18,12 +18,19 @@ import shutil
 # Cargar variables de entorno
 load_dotenv()
 
-app = FastAPI(title="StockAI Backend", description="Backend for stock management with OCR capabilities")
+app = FastAPI(title="StockAI Backend", description="Backend for stock management with OCR capabilities", version="1.0.0")
 
-# CORS middleware para permitir requests desde el frontend
+# Configuración CORS para production
+allowed_origins = ["*"]  # Por defecto permitir todo para desarrollo
+if os.getenv("VERCEL_DOMAIN"):
+    allowed_origins = [
+        f"https://{os.getenv('VERCEL_DOMAIN')}",
+        "http://localhost:3000"  # Para desarrollo local
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # URL del frontend Next.js
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,11 +39,11 @@ app.add_middleware(
 # Verificar variables de entorno
 aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
 aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-openai_api_key = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 print(f"AWS_ACCESS_KEY_ID: {'Configured' if aws_access_key else 'Missing'}")
 print(f"AWS_SECRET_ACCESS_KEY: {'Configured' if aws_secret_key else 'Missing'}")
-print(f"OPENAI_API_KEY: {'Configured' if openai_api_key else 'Missing'}")
+print(f"OPENAI_API_KEY: {'Configured' if OPENAI_API_KEY else 'Missing'}")
 
 # Configuración de AWS Textract (solo si las credenciales están disponibles)
 textract_client = None
@@ -49,10 +56,7 @@ if aws_access_key and aws_secret_key:
     )
 
 # Configuración de OpenAI (solo si la API key está disponible)
-openai_client = None
-if openai_api_key:
-    openai.api_key = openai_api_key
-    openai_client = openai.OpenAI(api_key=openai_api_key)
+openai_client = openai.OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Definir modelos primero
 class Proveedor(BaseModel):
@@ -120,19 +124,87 @@ def guardar_stock(productos: List[ProductoStock]):
         print(f"Error guardando stock: {e}")
 
 def detectar_proveedor(texto_factura: str) -> Proveedor:
-    """Detecta el proveedor basado en el texto de la factura"""
+    """Detecta el proveedor basado en el texto de la factura con búsqueda flexible"""
     proveedores = cargar_proveedores()
     texto_lower = texto_factura.lower()
     
+    print(f"🔍 Detectando proveedor en texto: '{texto_factura}'")
+    print(f"📋 Proveedores disponibles: {[p.nombre for p in proveedores]}")
+    
+    # Mapeo específico para cada proveedor
+    mapeos_proveedores = {
+        "HIF HIH Distribuciones": [
+            "h&h", "hih", "hif", "hyf", "h & h", "distribuciones",
+            "h&h distribuciones", "hif hih", "distribuciones h&h"
+        ],
+        "SMALL TASTES": [
+            "small", "tastes", "small tastes"
+        ],
+        "Coca-Cola FEMSA": [
+            "coca", "cola", "coca-cola", "femsa", "coca cola"
+        ],
+        "Distribuidora Central": [
+            "central", "distribuidora", "dist central", "distribuidora central"
+        ]
+    }
+    
+    # 1. Buscar coincidencias directas por nombre completo
     for proveedor in proveedores:
-        # Buscar el nombre del proveedor en el texto
         if proveedor.nombre.lower() in texto_lower:
+            print(f"✅ Proveedor encontrado por nombre completo: {proveedor.nombre}")
             return proveedor
         
         # Buscar por CUIT si está disponible
         if proveedor.cuit and proveedor.cuit in texto_factura:
+            print(f"✅ Proveedor encontrado por CUIT: {proveedor.nombre}")
             return proveedor
     
+    # 2. Buscar usando mapeos específicos
+    mejor_coincidencia = None
+    mejor_score = 0
+    
+    for proveedor in proveedores:
+        palabras_clave = mapeos_proveedores.get(proveedor.nombre, [])
+        score = 0
+        coincidencias_encontradas = []
+        
+        for palabra_clave in palabras_clave:
+            if palabra_clave.lower() in texto_lower:
+                score += len(palabra_clave)  # Dar más peso a palabras más largas
+                coincidencias_encontradas.append(palabra_clave)
+        
+        print(f"🎯 {proveedor.nombre}: score={score}, coincidencias={coincidencias_encontradas}")
+        
+        if score > mejor_score:
+            mejor_score = score
+            mejor_coincidencia = proveedor
+    
+    if mejor_coincidencia and mejor_score > 0:
+        print(f"✅ Proveedor encontrado por mapeo: {mejor_coincidencia.nombre} (score: {mejor_score})")
+        return mejor_coincidencia
+    
+    # 3. Búsqueda fuzzy por palabras individuales
+    for proveedor in proveedores:
+        palabras_proveedor = proveedor.nombre.lower().split()
+        palabras_texto = texto_lower.split()
+        
+        coincidencias = 0
+        for palabra_prov in palabras_proveedor:
+            if len(palabra_prov) > 2:  # Ignorar palabras muy cortas
+                for palabra_texto in palabras_texto:
+                    # Verificar si las palabras son similares
+                    if (palabra_prov in palabra_texto or palabra_texto in palabra_prov or
+                        abs(len(palabra_prov) - len(palabra_texto)) <= 2):
+                        coincidencias += 1
+                        break
+        
+        print(f"🔤 {proveedor.nombre}: {coincidencias} coincidencias de palabra")
+        
+        if coincidencias >= 1:
+            print(f"✅ Proveedor encontrado por coincidencia de palabras: {proveedor.nombre}")
+            return proveedor
+    
+    print(f"❌ No se encontró proveedor específico. Usando fallback: {proveedores[0].nombre if proveedores else 'None'}")
     # Si no se encuentra, devolver el primero como fallback
     return proveedores[0] if proveedores else None
 
@@ -414,14 +486,27 @@ async def process_text(input_data: TextInput):
             stock_actual = cargar_stock()
             productos_actuales = [producto.model_dump() for producto in stock_actual]
         
-        # Detectar proveedor en el texto
-        proveedor_detectado = detectar_proveedor(input_data.texto)
-        
         # Procesar con matching inteligente usando OpenAI
         resultado_matching = await procesar_texto_con_matching_inteligente(
             input_data.texto, 
             productos_actuales
         )
+        
+        # Detectar proveedor usando el resultado de OpenAI si está disponible
+        proveedor_detectado = None
+        if resultado_matching.get("proveedor_detectado"):
+            # Buscar el proveedor por nombre exacto
+            proveedores = cargar_proveedores()
+            for prov in proveedores:
+                if prov.nombre == resultado_matching["proveedor_detectado"]:
+                    proveedor_detectado = prov
+                    print(f"✅ Proveedor detectado por OpenAI: {prov.nombre}")
+                    break
+        
+        # Si OpenAI no detectó proveedor, usar la función fallback
+        if not proveedor_detectado:
+            proveedor_detectado = detectar_proveedor(input_data.texto)
+            print(f"🔄 Usando detección fallback de proveedor: {proveedor_detectado.nombre if proveedor_detectado else 'None'}")
         
         # Calcular impuestos para productos con precio
         productos_con_impuestos = []
@@ -579,14 +664,27 @@ async def process_audio(file: UploadFile = File(...), productos_actuales: str = 
                     detail=f"El audio no parece contener información sobre productos o inventario. Texto detectado: '{texto_transcrito}'"
                 )
             
-            # Detectar proveedor en el texto
-            proveedor_detectado = detectar_proveedor(texto_transcrito)
-            
             # Procesar con matching inteligente usando OpenAI
             resultado_matching = await procesar_texto_con_matching_inteligente(
                 texto_transcrito, 
                 productos_actuales_list
             )
+            
+            # Detectar proveedor usando el resultado de OpenAI si está disponible
+            proveedor_detectado = None
+            if resultado_matching.get("proveedor_detectado"):
+                # Buscar el proveedor por nombre exacto
+                proveedores = cargar_proveedores()
+                for prov in proveedores:
+                    if prov.nombre == resultado_matching["proveedor_detectado"]:
+                        proveedor_detectado = prov
+                        print(f"✅ Proveedor detectado por OpenAI: {prov.nombre}")
+                        break
+            
+            # Si OpenAI no detectó proveedor, usar la función fallback
+            if not proveedor_detectado:
+                proveedor_detectado = detectar_proveedor(texto_transcrito)
+                print(f"🔄 Usando detección fallback de proveedor: {proveedor_detectado.nombre if proveedor_detectado else 'None'}")
             
             # Calcular impuestos para productos con precio
             productos_con_impuestos = []
@@ -662,6 +760,10 @@ async def procesar_texto_con_matching_inteligente(texto: str, productos_actuales
         
         productos_texto = '\n'.join(productos_inventario[:50])  # Limitar para no exceder tokens
         
+        # Obtener lista de proveedores para el prompt
+        proveedores = cargar_proveedores()
+        proveedores_texto = '\n'.join([f"- {p.nombre}" for p in proveedores])
+        
         prompt = f"""
 Eres un asistente experto en gestión de inventarios. Analiza el texto de entrada de mercadería y haz matching inteligente con los productos existentes.
 
@@ -671,11 +773,14 @@ TEXTO DE ENTRADA:
 INVENTARIO ACTUAL:
 {productos_texto}
 
+PROVEEDORES REGISTRADOS:
+{proveedores_texto}
+
 INSTRUCCIONES:
 1. Analiza el texto para identificar:
    - QUE productos llegaron
    - CANTIDADES exactas
-   - PROVEEDOR/DISTRIBUIDORA mencionada
+   - PROVEEDOR/DISTRIBUIDORA mencionada (ver lista arriba)
    - PRECIOS si se mencionan
    - ACCIÓN (entrada/salida)
 
@@ -689,9 +794,12 @@ INSTRUCCIONES:
    - Texto: "llegaron fideos" → Buscar "Fideos", "pasta", productos similares
    - Texto: "5 coca cola" → Buscar "Coca", "Coca-Cola", "gaseosa"
 
-4. DETECCIÓN DE PROVEEDOR:
-   - Buscar nombres de distribuidoras/proveedores en el texto
-   - Ejemplo: "HiH Distribuciones", "Distribuidora Norte", etc.
+4. DETECCIÓN DE PROVEEDOR MUY IMPORTANTE:
+   - Si el texto menciona "H&H", "HiH", "H & H", "HIH distribuciones" → Es "HIF HIH Distribuciones"
+   - Si menciona "Small Tastes", "Small" → Es "SMALL TASTES"
+   - Si menciona "Coca Cola", "Femsa" → Es "Coca-Cola FEMSA"
+   - Si menciona "Central", "Distribuidora Central" → Es "Distribuidora Central"
+   - IMPORTANTE: En el análisis menciona claramente qué proveedor detectaste
 
 FORMATO DE RESPUESTA (JSON):
 {{
@@ -706,7 +814,8 @@ FORMATO DE RESPUESTA (JSON):
             "producto_id": id_del_producto_existente_o_null
         }}
     ],
-    "analisis_ia": "Explicación detallada de lo que detectaste y cómo hiciste el matching"
+    "proveedor_detectado": "Nombre exacto del proveedor de la lista o null",
+    "analisis_ia": "Explicación detallada de lo que detectaste, incluyendo el proveedor identificado y cómo hiciste el matching"
 }}
 
 REGLAS IMPORTANTES:
@@ -716,7 +825,8 @@ REGLAS IMPORTANTES:
 - Sé generoso con el matching SOLO si hay productos realmente mencionados
 - Si no estás seguro de qué producto es, indica menor confianza
 - La explicación debe ser clara sobre las decisiones tomadas
-- Si detectas un proveedor, menciónalo en el análisis
+- SIEMPRE menciona qué proveedor detectaste en el análisis
+- Si detectas H&H en cualquier variación, debe ser "HIF HIH Distribuciones"
 
 EJEMPLO DE TEXTOS QUE NO DEBES PROCESAR:
 - Ruido sin sentido: "hmm ah eh ok"

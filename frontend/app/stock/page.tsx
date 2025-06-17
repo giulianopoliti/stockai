@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Mic, Camera, Package, Edit, CheckCircle, XCircle } from "lucide-react"
+import { api } from "@/lib/api"
 
 // Tipos para los productos
 interface Producto {
@@ -46,7 +47,7 @@ export default function StockPage() {
   const cargarStock = async () => {
     try {
       setCargando(true)
-      const response = await fetch('http://localhost:8000/api/stock')
+      const response = await fetch(api.stock)
       
       if (!response.ok) {
         throw new Error('Error cargando stock')
@@ -63,9 +64,9 @@ export default function StockPage() {
   }
 
   const getStockStatus = (stock: number, stockMinimo: number) => {
-    if (stock <= stockMinimo * 0.5) return { status: "crítico", color: "bg-red-500/20 text-red-600 border-red-500/30" }
-    if (stock <= stockMinimo) return { status: "bajo", color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30" }
-    return { status: "normal", color: "bg-green-500/20 text-green-600 border-green-500/30" }
+    if (stock <= stockMinimo * 0.5) return { status: "crítico", color: "bg-red-500/20 text-red-400 border-red-500/30" }
+    if (stock <= stockMinimo) return { status: "bajo", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" }
+    return { status: "normal", color: "bg-green-500/20 text-green-400 border-green-500/30" }
   }
 
   const procesarTextoStock = async (texto: string) => {
@@ -73,7 +74,7 @@ export default function StockPage() {
       // Mostrar modal de carga
       setProcesandoFactura(true)
       
-      const response = await fetch('http://localhost:8000/process-text', {
+      const response = await fetch(api.processText, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +156,7 @@ export default function StockPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('http://localhost:8000/process-invoice', {
+      const response = await fetch(api.processInvoice, {
         method: 'POST',
         body: formData
       })
@@ -295,7 +296,7 @@ export default function StockPage() {
       formData.append('file', audioBlob, 'audio.webm')
       formData.append('productos_actuales', JSON.stringify(productos))
 
-      const response = await fetch('http://localhost:8000/process-audio', {
+      const response = await fetch(api.processAudio, {
         method: 'POST',
         body: formData
       })
@@ -345,7 +346,7 @@ export default function StockPage() {
   const confirmarCambiosStock = async () => {
     try {
       // Enviar actualización al backend
-      const response = await fetch('http://localhost:8000/api/stock', {
+      const response = await fetch(api.stock, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -397,50 +398,56 @@ export default function StockPage() {
   )
 
   return (
-    <SidebarInset>
-      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-        <div className="flex items-center gap-2 px-4">
-          <SidebarTrigger className="-ml-1" suppressHydrationWarning />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+    <SidebarInset className="min-h-screen">
+      <header className="glass-header flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <div className="flex items-center gap-2 px-6">
+          <SidebarTrigger className="-ml-1 hover:glass-button transition-all duration-300 text-gray-300 hover:text-white" suppressHydrationWarning />
+          <Separator orientation="vertical" className="mr-2 h-4 bg-white/10" />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage>Gestión de Stock</BreadcrumbPage>
+                <BreadcrumbPage className="text-gray-300 font-medium">Gestión de Stock</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </div>
       </header>
 
-      <div className="flex-1 space-y-4 p-4">
+      <div className="flex-1 space-y-6 p-6">
         {/* Controles de actualización de stock */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="glass-card hover-lift">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mic className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-gradient">
+                <Mic className="h-5 w-5 text-blue-400" />
                 Entrada inteligente de stock
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Input
                   placeholder="Ej: Llegaron 10 latas de Smirnoff manzana de HiH Distribuciones"
                   value={textoInput}
                   onChange={(e) => setTextoInput(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && procesarTextoStock(textoInput)}
+                  className="glass text-white placeholder:text-gray-400 border-white/10 focus:border-blue-400/50"
                   suppressHydrationWarning
                 />
-                <Button onClick={() => procesarTextoStock(textoInput)} disabled={!textoInput.trim()} suppressHydrationWarning>
+                <Button 
+                  onClick={() => procesarTextoStock(textoInput)} 
+                  disabled={!textoInput.trim()} 
+                  className="glass-button px-4"
+                  suppressHydrationWarning
+                >
                   <Edit className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-gray-400">
                 La IA analizará tu texto y buscará automáticamente los productos en tu inventario
               </div>
               <Button 
                 variant="outline" 
-                className={`w-full ${grabando ? 'bg-red-50 border-red-300 text-red-700' : ''}`}
+                className={`w-full glass-button ${grabando ? 'bg-red-500/20 border-red-500/50 text-red-300' : 'text-gray-300'}`}
                 onClick={grabando ? detenerGrabacion : iniciarGrabacion}
                 disabled={procesandoFactura}
                 suppressHydrationWarning
@@ -451,39 +458,39 @@ export default function StockPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card hover-lift">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-gradient">
+                <Camera className="h-5 w-5 text-violet-400" />
                 Procesar factura con IA
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               {/* Zona de drag & drop */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`
-                  border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+                  border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 cursor-pointer glass
                   ${arrastrando 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                    ? 'border-blue-400 bg-blue-500/10' 
+                    : 'border-white/20 hover:border-white/40'
                   }
                 `}
                 onClick={procesarFactura}
                 suppressHydrationWarning
               >
-                <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="font-medium">
+                <Camera className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+                <p className="font-medium text-white">
                   {arrastrando ? '¡Suelta la factura aquí!' : 'Arrastra tu factura aquí'}
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-gray-400 mt-2">
                   o haz clic para seleccionar archivo
                 </p>
               </div>
               
-              <div className="text-sm text-muted-foreground text-center">
+              <div className="text-sm text-gray-400 text-center">
                 Sube una foto de la factura para actualizar el stock automáticamente
               </div>
             </CardContent>
@@ -491,18 +498,18 @@ export default function StockPage() {
         </div>
 
         {/* Lista de productos en stock */}
-        <Card>
+        <Card className="glass-card hover-lift">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-gradient">
+                <Package className="h-5 w-5 text-emerald-400" />
                 Inventario Actual
               </CardTitle>
               <Input
                 placeholder="Buscar productos..."
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
-                className="max-w-sm"
+                className="max-w-sm glass text-white placeholder:text-gray-400 border-white/10 focus:border-emerald-400/50"
                 suppressHydrationWarning
               />
             </div>
@@ -510,7 +517,8 @@ export default function StockPage() {
           <CardContent>
             {cargando ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">Cargando stock...</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-4"></div>
+                <p className="text-gray-400">Cargando stock...</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -519,19 +527,19 @@ export default function StockPage() {
                 return (
                   <div
                     key={producto.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-4 glass rounded-xl hover:glass-button transition-all duration-300 hover-lift"
                   >
                     <div className="flex-1">
-                      <div className="font-medium">{producto.nombre}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="font-medium text-white">{producto.nombre}</div>
+                      <div className="text-sm text-gray-400">
                         {producto.categoria} • ${producto.precio_con_impuestos}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <div className="font-medium">Stock: {producto.stock}</div>
-                        <div className="text-sm text-muted-foreground">Mín: {producto.stock_minimo}</div>
+                        <div className="font-medium text-white">Stock: {producto.stock}</div>
+                        <div className="text-sm text-gray-400">Mín: {producto.stock_minimo}</div>
                       </div>
 
                       <Badge className={stockInfo.color}>{stockInfo.status}</Badge>
@@ -547,14 +555,14 @@ export default function StockPage() {
 
       {/* Modal de confirmación de cambios */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="glass-card border-white/10 max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-gradient">
               🤖 {modalData?.tipo === "factura" ? "Factura procesada" : 
                    modalData?.tipo === "audio" ? "Audio transcrito y analizado" : 
                    "Entrada de stock analizada"}
               {modalData?.proveedor && (
-                <Badge variant="outline" className="ml-2">
+                <Badge variant="outline" className="ml-2 bg-blue-500/20 text-blue-300 border-blue-500/30">
                   {modalData.proveedor.nombre} - {modalData.proveedor.impuesto}% impuesto
                 </Badge>
               )}
@@ -562,23 +570,23 @@ export default function StockPage() {
           </DialogHeader>
 
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            <div className="p-3 bg-muted rounded-lg flex-shrink-0">
-              <p className="text-sm text-muted-foreground mb-2">
+            <div className="p-3 glass rounded-lg flex-shrink-0">
+              <p className="text-sm text-gray-400 mb-2">
                 {modalData?.tipo === "factura" ? "Factura procesada:" : 
                  modalData?.tipo === "audio" ? "Audio transcrito:" : 
                  "Texto procesado:"}
               </p>
-              <p className="font-medium text-sm">
+              <p className="font-medium text-sm text-white">
                 "{modalData?.texto && modalData.texto.length > 100 
                   ? modalData.texto.substring(0, 100) + "..." 
                   : modalData?.texto}"
               </p>
               {modalData?.texto && modalData.texto.length > 100 && (
                 <details className="mt-2">
-                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
                     Ver texto completo
                   </summary>
-                  <p className="text-xs text-muted-foreground mt-2 max-h-24 overflow-y-auto">
+                  <p className="text-xs text-gray-400 mt-2 max-h-24 overflow-y-auto">
                     {modalData.texto}
                   </p>
                 </details>
@@ -587,100 +595,111 @@ export default function StockPage() {
 
             {/* Análisis de IA */}
             {modalData?.analisis_ia && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 flex-shrink-0">
+              <div className="p-3 glass rounded-lg border border-blue-500/20 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <p className="text-sm font-medium text-blue-900">Análisis inteligente</p>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <p className="text-sm font-medium text-blue-300">Análisis inteligente</p>
                 </div>
-                <p className="text-sm text-blue-800">{modalData.analisis_ia}</p>
+                <p className="text-sm text-blue-200">{modalData.analisis_ia}</p>
               </div>
             )}
 
             <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
               <div className="flex items-center justify-between flex-shrink-0">
-                <p className="text-sm font-medium">Productos identificados:</p>
-                <Badge variant="secondary" className="text-xs">
+                <p className="text-sm font-medium text-white">Productos identificados:</p>
+                <Badge variant="secondary" className="text-xs bg-gray-700/50 text-gray-300">
                   {modalData?.productos.length} productos
                 </Badge>
               </div>
               
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                 {modalData?.productos.map((producto: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-muted hover:border-muted-foreground/20 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm truncate">{producto.nombre}</p>
-                        {producto.es_nuevo && (
-                          <Badge variant="default" className="text-xs bg-orange-500 hover:bg-orange-600">
-                            Nuevo
-                          </Badge>
-                        )}
-                        {producto.producto_id && (
-                          <Badge variant="secondary" className="text-xs">
-                            Match ID: {producto.producto_id}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <span className={`inline-block w-2 h-2 rounded-full ${
-                            producto.accion === "entrada" ? "bg-green-500" : "bg-red-500"
-                          }`}></span>
-                          {producto.accion === "entrada" ? "+" : "-"}
-                          {producto.cantidad} unidades
-                        </p>
-                        {producto.precio_con_impuestos && (
-                          <p className="text-xs text-blue-600 font-medium">
-                            ${producto.precio_con_impuestos.toLocaleString()}
-                            {producto.precio_sin_impuestos && (
-                              <span className="text-muted-foreground ml-1">
-                                (sin imp: ${producto.precio_sin_impuestos.toLocaleString()})
+                  <div key={index} className="p-4 glass rounded-xl border border-white/10 hover:border-white/30 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className="font-semibold text-base text-white truncate">{producto.nombre}</h3>
+                          {producto.es_nuevo && (
+                            <Badge variant="default" className="text-xs bg-orange-500/20 text-orange-300 border-orange-500/30">
+                              Nuevo
+                            </Badge>
+                          )}
+                          {producto.producto_id && (
+                            <Badge variant="secondary" className="text-xs bg-gray-700/50 text-gray-300">
+                              ID: {producto.producto_id}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block w-3 h-3 rounded-full ${
+                              producto.accion === "entrada" ? "bg-green-400" : "bg-red-400"
+                            }`}></span>
+                            <span className="text-sm text-white font-medium">
+                              {producto.accion === "entrada" ? "+" : "-"}{producto.cantidad} unidades
+                            </span>
+                          </div>
+                          
+                          {producto.precio_con_impuestos && (
+                            <div className="text-sm">
+                              <span className="text-blue-400 font-semibold">
+                                ${producto.precio_con_impuestos.toLocaleString()} c/u
                               </span>
-                            )}
-                          </p>
-                        )}
+                              {producto.precio_sin_impuestos && (
+                                <div className="text-xs text-gray-400">
+                                  Sin imp: ${producto.precio_sin_impuestos.toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {producto.precio_con_impuestos && (
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-emerald-400">
+                                Total: ${(producto.precio_con_impuestos * producto.cantidad).toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs ${
-                          producto.confianza >= 90 ? 'text-green-600 border-green-500' :
-                          producto.confianza >= 70 ? 'text-yellow-600 border-yellow-500' :
-                          'text-red-600 border-red-500'
-                        }`}
-                      >
-                        {producto.confianza}%
-                      </Badge>
-                      {producto.precio_con_impuestos && (
-                        <p className="text-xs text-muted-foreground">
-                          Total: ${(producto.precio_con_impuestos * producto.cantidad).toLocaleString()}
-                        </p>
-                      )}
+                      
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-sm px-3 py-1 ${
+                            producto.confianza >= 90 ? 'text-green-400 border-green-500/50 bg-green-500/10' :
+                            producto.confianza >= 70 ? 'text-yellow-400 border-yellow-500/50 bg-yellow-500/10' :
+                            'text-red-400 border-red-500/50 bg-red-500/10'
+                          }`}
+                        >
+                          {producto.confianza}% confianza
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
               
               {modalData?.productos.length === 0 && (
-                <div className="text-center py-6 text-muted-foreground">
+                <div className="text-center py-6 text-gray-400">
                   <p className="text-sm">No se detectaron productos</p>
                 </div>
               )}
 
               {modalData?.resumen && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-sm text-blue-900 mb-2">Resumen de la factura</h4>
+                <div className="mt-4 p-3 glass rounded-lg border border-emerald-500/20">
+                  <h4 className="font-medium text-sm text-emerald-300 mb-2">Resumen de la factura</h4>
                   <div className="space-y-1 text-xs">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-gray-300">
                       <span>Subtotal (sin impuestos):</span>
                       <span>${modalData.resumen.subtotal.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-gray-300">
                       <span>Impuestos ({modalData.proveedor?.impuesto}%):</span>
                       <span>${modalData.resumen.impuestos.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between font-medium border-t pt-1">
+                    <div className="flex justify-between font-medium border-t border-white/10 pt-1 text-white">
                       <span>Total:</span>
                       <span>${modalData.resumen.total.toLocaleString()}</span>
                     </div>
@@ -691,16 +710,20 @@ export default function StockPage() {
           </div>
 
           <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button onClick={confirmarCambiosStock} className="w-full" suppressHydrationWarning>
+            <Button 
+              onClick={confirmarCambiosStock} 
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 font-semibold" 
+              suppressHydrationWarning
+            >
               <CheckCircle className="w-4 h-4 mr-2" />
               Confirmar y actualizar stock
             </Button>
             <div className="flex gap-2 w-full">
-              <Button variant="outline" className="flex-1" suppressHydrationWarning>
+              <Button variant="outline" className="flex-1 glass-button text-gray-300" suppressHydrationWarning>
                 <Edit className="w-4 w-4 mr-1" />
                 Modificar
               </Button>
-              <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1" suppressHydrationWarning>
+              <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1 glass-button text-gray-300" suppressHydrationWarning>
                 <XCircle className="w-4 h-4 mr-1" />
                 Cancelar
               </Button>
@@ -711,18 +734,18 @@ export default function StockPage() {
 
       {/* Modal de análisis de factura */}
       <Dialog open={procesandoFactura} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="glass-card border-white/10 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center">
+            <DialogTitle className="text-center text-gradient">
               🤖 Analizando Factura
             </DialogTitle>
           </DialogHeader>
           
           <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
             <div className="text-center space-y-2">
-              <p className="font-medium">Estamos procesando con Inteligencia Artificial</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="font-medium text-white">Estamos procesando con Inteligencia Artificial</p>
+              <p className="text-sm text-gray-400">
                 {grabando ? 'Transcribiendo audio y analizando productos...' : 'Esto puede tomar unos momentos...'}
               </p>
             </div>
