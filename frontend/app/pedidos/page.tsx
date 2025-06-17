@@ -54,7 +54,7 @@ const sugerenciasIA = [
   {
     proveedor: "Lácteos del Sur",
     productos: [
-      { nombre: "Yogur Ser", cantidad: 20, precio: 120, precio: 120, urgencia: "alta" },
+      { nombre: "Yogur Ser", cantidad: 20, precio: 120, urgencia: "alta" },
       { nombre: "Leche Entera 1L", cantidad: 18, precio: 280, urgencia: "alta" },
     ],
     total: 7440,
