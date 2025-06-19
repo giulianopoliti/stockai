@@ -1,7 +1,7 @@
 "use client"
 
 import type * as React from "react"
-import { ShoppingCart, Package, Users, ClipboardList, AlertTriangle, BarChart3 } from "lucide-react"
+import { ShoppingCart, Package, Users, ClipboardList, AlertTriangle, BarChart3, Home } from "lucide-react"
 
 import {
   Sidebar,
@@ -16,10 +16,14 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const menuItems = [
+const menuItems = [  {
+  title: "Inicio",
+  url: "/",
+  icon: Home,
+},
   {
     title: "Ventas",
-    url: "/",
+    url: "/ventas",
     icon: ShoppingCart,
   },
   {
