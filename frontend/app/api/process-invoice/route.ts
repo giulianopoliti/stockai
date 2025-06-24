@@ -81,8 +81,10 @@ export async function POST(request: NextRequest) {
           console.log('🔄 Iniciando análisis con Gemini 2.5 Flash...');
       console.log('🔑 Google API Key disponible:', process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'SÍ' : 'NO');
       console.log('🔑 Primeros caracteres:', process.env.GOOGLE_GENERATIVE_AI_API_KEY?.substring(0, 10) + '...');
+      console.log('📊 Intentando llamar a generateObject...');
 
       // Procesar imagen con Gemini 2.5 Flash - Mejor para documentos y más barato
+      console.log('⏰ Timestamp antes de Gemini:', new Date().toISOString());
       const result = await generateObject({
         model: google('gemini-2.5-flash'),
       schema: OCRResponse,
@@ -154,6 +156,7 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
       temperature: 0.0, // Temperatura mínima para máxima precisión numérica
     });
 
+          console.log('⏰ Timestamp después de Gemini:', new Date().toISOString());
           console.log('✅ Gemini completó el análisis OCR');
       
       // Procesar datos y aplicar lógica de negocio
@@ -305,17 +308,25 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
         }
       ],
       texto_completo: `🚨 ERROR DETALLADO:
-      
-Tipo: ${error instanceof Error ? error.constructor.name : typeof error}
-Mensaje: ${error instanceof Error ? error.message : String(error)}
-Google API Key: ${process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'CONFIGURADA' : 'FALTANTE'}
-Archivo: ${file?.type} (${file?.size} bytes)
-Entorno: ${process.env.NODE_ENV}
-Timestamp: ${new Date().toISOString()}
 
-Stack: ${error instanceof Error ? error.stack : 'No disponible'}
+❌ PROBLEMA PRINCIPAL: ${error instanceof Error ? error.message : String(error)}
 
-[DATOS SIMULADOS - REVISAR ERROR ARRIBA]`,
+🔧 DIAGNÓSTICO:
+• Google API Key: ${process.env.GOOGLE_GENERATIVE_AI_API_KEY ? '✅ CONFIGURADA' : '❌ FALTANTE'}
+• Tipo de Error: ${error instanceof Error ? error.constructor.name : typeof error}
+• Archivo: ${file?.type} (${file?.size} bytes)
+• Entorno: ${process.env.NODE_ENV}
+• Timestamp: ${new Date().toISOString()}
+
+💡 POSIBLES SOLUCIONES:
+${!process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 
+  '1. ❌ CONFIGURAR Google API Key en Vercel\n2. Redesplegar la aplicación' : 
+  '1. ✅ API Key configurada - revisar cuota/permisos\n2. Verificar formato del archivo\n3. Revisar conexión de red'}
+
+📋 Stack Trace:
+${error instanceof Error ? error.stack : 'No disponible'}
+
+[DATOS SIMULADOS - REVISAR DIAGNÓSTICO ARRIBA]`,
       success: false,
       debug: {
         hasApiKey: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
