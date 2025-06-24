@@ -293,19 +293,38 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
     console.error('📄 Tipo de archivo procesado:', file?.type);
     console.error('📏 Tamaño del archivo:', file?.size, 'bytes');
     
-    // Fallback con datos simulados
+    // Fallback con datos simulados y información de debug
     const respuestaFallback = {
       productos: [
         {
-          nombre: "Producto detectado (simulado)",
+          nombre: "🚨 ERROR - Producto simulado",
           cantidad: 1,
           precio_sin_impuestos: 100,
           precio_con_impuestos: 121,
           confianza: 60
         }
       ],
-      texto_completo: `Error procesando ${esPDF ? 'PDF' : 'imagen'}: ${error instanceof Error ? error.message : 'Unknown error'}\n\n${esPDF ? '[PDF procesado con OCR - usando datos simulados]' : '[Imagen procesada - usando datos simulados]'}`,
-      success: false
+      texto_completo: `🚨 ERROR DETALLADO:
+      
+Tipo: ${error instanceof Error ? error.constructor.name : typeof error}
+Mensaje: ${error instanceof Error ? error.message : String(error)}
+Google API Key: ${process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'CONFIGURADA' : 'FALTANTE'}
+Archivo: ${file?.type} (${file?.size} bytes)
+Entorno: ${process.env.NODE_ENV}
+Timestamp: ${new Date().toISOString()}
+
+Stack: ${error instanceof Error ? error.stack : 'No disponible'}
+
+[DATOS SIMULADOS - REVISAR ERROR ARRIBA]`,
+      success: false,
+      debug: {
+        hasApiKey: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+        environment: process.env.NODE_ENV,
+        fileType: file?.type,
+        fileSize: file?.size,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      }
     };
 
     return Response.json(respuestaFallback);

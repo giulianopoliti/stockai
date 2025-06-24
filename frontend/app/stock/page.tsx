@@ -560,14 +560,33 @@ export default function StockPage() {
               </div>
               
               {/* Botón de escaneado con cámara */}
-              <Button 
-                onClick={iniciarEscaneo}
-                className="w-full glass-button hover:glass text-white border-white/20 hover:border-emerald-400/50"
-                variant="outline"
-              >
-                <Scan className="h-4 w-4 mr-2" />
-                Escanear con cámara
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  onClick={iniciarEscaneo}
+                  className="w-full glass-button hover:glass text-white border-white/20 hover:border-emerald-400/50"
+                  variant="outline"
+                >
+                  <Scan className="h-4 w-4 mr-2" />
+                  Escanear con cámara
+                </Button>
+                
+                {/* Botón temporal de debug */}
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/debug-logs');
+                      const data = await response.json();
+                      alert(`🔧 DEBUG INFO:\n\nAPI Key: ${data.data.hasGoogleApiKey ? 'CONFIGURADA' : 'FALTANTE'}\nEntorno: ${data.data.environment}\nTimestamp: ${data.data.timestamp}\n\nKey prefix: ${data.data.googleApiKeyPrefix}`);
+                    } catch (error) {
+                      alert(`Error obteniendo debug info: ${error}`);
+                    }
+                  }}
+                  className="w-full glass-button hover:glass text-orange-300 border-orange-500/20 hover:border-orange-400/50 text-xs"
+                  variant="outline"
+                >
+                  🔧 Ver Info de Debug
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
