@@ -1,16 +1,20 @@
-const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
-export const API_BASE_URL = baseUrl
+// 🚀 Migrado a APIs locales de Next.js - Sin backend Python
+const isLocal = process.env.NODE_ENV === 'development'
+const baseUrl = isLocal ? '' : (process.env.NEXT_PUBLIC_API_URL || '')
 
-console.log('🔧 API Configuration Debug:')
-console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
-console.log('API_BASE_URL:', API_BASE_URL)
+console.log('🔧 API Configuration (Migrado a Next.js):')
+console.log('NODE_ENV:', process.env.NODE_ENV)
+console.log('BASE_URL:', baseUrl || 'APIs locales de Next.js')
 
 export const api = {
-  stock: `${API_BASE_URL}/api/stock`,
-  processText: `${API_BASE_URL}/process-text`,
-  processAudio: `${API_BASE_URL}/process-audio`,
-  processInvoice: `${API_BASE_URL}/process-invoice`,
-  proveedores: `${API_BASE_URL}/api/proveedores`,
+  // ✅ APIs migradas a Next.js
+  stock: `${baseUrl}/api/stock`,
+  processInvoice: `${baseUrl}/api/process-invoice`, 
+  processAudio: `${baseUrl}/api/process-audio`,
+  
+  // 🔄 APIs pendientes de migración (mantienen backend Python)
+  processText: `${baseUrl}/api/process-text`, // TODO: Crear route.ts
+  proveedores: `${baseUrl}/api/proveedores`, // TODO: Crear route.ts
 } 
 
-console.log('🔧 API Endpoints:', api) 
+console.log('🔧 API Endpoints (Next.js):', api) 
