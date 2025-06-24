@@ -45,15 +45,24 @@ export async function POST(request: NextRequest) {
 
     console.log(`📄 Archivo recibido: ${file.name}, tamaño: ${file.size} bytes, tipo: ${file.type}`);
 
-    // Validar tipo de archivo
-    if (!file.type.startsWith('image/')) {
-      return Response.json({ error: 'El archivo debe ser una imagen' }, { status: 400 });
+    // Validar tipo de archivo (imágenes y PDFs)
+    const tiposPermitidos = ['image/', 'application/pdf'];
+    const esArchivoValido = tiposPermitidos.some(tipo => file.type.startsWith(tipo));
+    
+    if (!esArchivoValido) {
+      return Response.json({ 
+        error: 'El archivo debe ser una imagen (JPG, PNG, etc.) o un PDF' 
+      }, { status: 400 });
     }
 
     // Convertir archivo a base64
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = file.type;
+    
+    // Log del tipo de archivo para debugging
+    console.log(`📋 Procesando archivo: ${file.type === 'application/pdf' ? 'PDF' : 'Imagen'}`);
+    console.log(`📏 Tamaño: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
 
           console.log('🔄 Iniciando análisis con Gemini 2.5 Flash...');
       console.log('🔑 Google API Key disponible:', process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'SÍ' : 'NO');
@@ -66,7 +75,13 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `Eres un experto en lectura sistemática de facturas argentinas. DEBES seguir un PROCESO PASO A PASO.
+          content: `Eres un experto en lectura sistemática de facturas argentinas (imágenes y PDFs). DEBES seguir un PROCESO PASO A PASO.
+
+PROVEEDORES COMUNES A DETECTAR:
+- HIF HIH Distribuciones (H&H): Snacks, Twistos, golosinas
+- SMALL TASTES: Chocolates, dulces, confitería
+- Coca-Cola FEMSA: Bebidas, gaseosas
+- Distribuidora Central: Productos varios
 
 METODOLOGÍA OBLIGATORIA:
 
@@ -113,7 +128,7 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
             content: [
               {
                 type: 'text',
-                text: 'ANALIZA ESTA FACTURA PASO A PASO. IMPORTANTE: Esta factura tiene 6 líneas de productos. Debes leer TODAS secuencialmente y reportar exactamente 6 productos. No te saltes ninguna línea. Sigue la metodología paso a paso que te indiqué.'
+                text: 'ANALIZA ESTA FACTURA PASO A PASO (imagen o PDF escaneado). Lee TODAS las líneas de productos secuencialmente. No te saltes ninguna línea. Sigue la metodología paso a paso que te indiqué.'
               },
             {
               type: 'image',
@@ -160,16 +175,19 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
         }
       } else {
         console.log(`⚠️ Gemini no detectó proveedor en la factura`);
+        // Si no se detecta proveedor, usar uno por defecto para cálculos
+        proveedorFinal = { id: 999, nombre: "Proveedor General", impuesto: 21, telefono: "000000000" } as any;
+        console.log(`🔄 Usando proveedor por defecto: ${proveedorFinal?.nombre} (${(proveedorFinal as any)?.impuesto}% IVA)`);
       }
 
-          // Calcular impuestos si hay proveedor
+          // Calcular impuestos (siempre, con proveedor detectado o por defecto)
       console.log(`\n💰 === CÁLCULO DE IMPUESTOS ===`);
       console.log(`🏢 Proveedor para cálculos: ${proveedorFinal?.nombre || 'Ninguno'}`);
       
       const productosConImpuestos = responseData.productos.map((producto, index) => {
         console.log(`\n📝 Procesando Producto ${index + 1}: "${producto.nombre}"`);
         
-        if (producto.precio_sin_impuestos && proveedorFinal) {
+        if (producto.precio_sin_impuestos) {
           const impuestoPorcentaje = (proveedorFinal as any).impuesto || 21;
           const precioConImpuestos = producto.precio_sin_impuestos * (1 + impuestoPorcentaje / 100);
           
@@ -199,7 +217,7 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
     
     console.log(`\n📊 === CÁLCULO DE RESUMEN FINAL ===`);
     
-    if (!resumenFinal && proveedorFinal && productosConImpuestos.length > 0) {
+    if (!resumenFinal && productosConImpuestos.length > 0) {
       console.log(`🧮 Calculando resumen manualmente...`);
       
       const subtotal = productosConImpuestos.reduce((acc, p) => 
@@ -246,6 +264,11 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
   } catch (error) {
     console.error('Error procesando factura:', error);
     
+    // Mensaje específico según tipo de archivo
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const esPDF = file?.type === 'application/pdf';
+    
     // Fallback con datos simulados
     const respuestaFallback = {
       productos: [
@@ -257,7 +280,7 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
           confianza: 60
         }
       ],
-      texto_completo: `Error: ${error instanceof Error ? error.message : 'Unknown error'}\n[Datos simulados]`,
+      texto_completo: `Error procesando ${esPDF ? 'PDF' : 'imagen'}: ${error instanceof Error ? error.message : 'Unknown error'}\n\n${esPDF ? '[PDF procesado con OCR - usando datos simulados]' : '[Imagen procesada - usando datos simulados]'}`,
       success: false
     };
 
@@ -286,10 +309,10 @@ function detectarProveedor(textoProveedor: string, proveedores: any[]) {
   
   // Mapeos específicos para cada proveedor
   const mapeos = {
-    "HIF HIH Distribuciones": ["h&h", "hih", "hif", "h & h", "distribuciones"],
-    "SMALL TASTES": ["small", "tastes", "small tastes"],
-    "Coca-Cola FEMSA": ["coca", "cola", "coca-cola", "femsa"],
-    "Distribuidora Central": ["central", "distribuidora", "dist central"]
+    "HIF HIH Distribuciones": ["h&h", "hih", "hif", "h & h", "distribuciones", "hih distribuciones"],
+    "SMALL TASTES": ["small", "tastes", "small tastes", "golosinas", "dulces"],
+    "Coca-Cola FEMSA": ["coca", "cola", "coca-cola", "femsa", "bebidas"],
+    "Distribuidora Central": ["central", "distribuidora", "dist central", "mayorista"]
   };
   
   // Buscar coincidencias

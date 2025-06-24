@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Mic, Camera, Package, Edit, CheckCircle, XCircle } from "lucide-react"
+import { Mic, Camera, Package, Edit, CheckCircle, XCircle, Scan, X } from "lucide-react"
 import { api } from "@/lib/api"
 
 // Tipos para los productos
@@ -38,6 +38,8 @@ export default function StockPage() {
   const [arrastrando, setArrastrando] = useState(false)
   const [grabando, setGrabando] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [escaneando, setEscaneando] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
 
   // Cargar stock desde API
   useEffect(() => {
@@ -214,7 +216,7 @@ export default function StockPage() {
     // Crear input de archivo
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = 'image/*,application/pdf'
     
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
@@ -224,6 +226,67 @@ export default function StockPage() {
     }
     
     input.click()
+  }
+
+  const iniciarEscaneo = async () => {
+    try {
+      setEscaneando(true)
+      
+      // Solicitar acceso a la cámara con configuración optimizada para documentos
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Cámara trasera preferida
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      })
+      
+      setStream(mediaStream)
+    } catch (error) {
+      console.error('Error accediendo a la cámara:', error)
+      alert('No se pudo acceder a la cámara. Verifique los permisos.')
+      setEscaneando(false)
+    }
+  }
+
+  const capturarFactura = async () => {
+    if (!stream) return
+
+    try {
+      // Crear canvas para capturar la imagen
+      const video = document.querySelector('#scanner-video') as HTMLVideoElement
+      if (!video) return
+
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      ctx.drawImage(video, 0, 0)
+      
+      // Convertir a blob y procesar
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const file = new File([blob], 'factura-escaneada.jpg', { type: 'image/jpeg' })
+          await procesarArchivo(file)
+          cerrarEscaner()
+        }
+      }, 'image/jpeg', 0.9)
+      
+    } catch (error) {
+      console.error('Error capturando imagen:', error)
+      alert('Error al capturar la imagen')
+    }
+  }
+
+  const cerrarEscaner = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      setStream(null)
+    }
+    setEscaneando(false)
   }
 
   // Handlers para drag & drop
@@ -242,10 +305,12 @@ export default function StockPage() {
     setArrastrando(false)
     
     const files = Array.from(e.dataTransfer.files)
-    const imageFile = files.find(file => file.type.startsWith('image/'))
+    const validFile = files.find(file => 
+      file.type.startsWith('image/') || file.type === 'application/pdf'
+    )
     
-    if (imageFile) {
-      await procesarArchivo(imageFile)
+    if (validFile) {
+      await procesarArchivo(validFile)
     }
   }
 
@@ -491,8 +556,18 @@ export default function StockPage() {
               </div>
               
               <div className="text-sm text-gray-400 text-center">
-                Sube una foto de la factura para actualizar el stock automáticamente
+                Sube una foto o PDF de la factura para actualizar el stock automáticamente
               </div>
+              
+              {/* Botón de escaneado con cámara */}
+              <Button 
+                onClick={iniciarEscaneo}
+                className="w-full glass-button hover:glass text-white border-white/20 hover:border-emerald-400/50"
+                variant="outline"
+              >
+                <Scan className="h-4 w-4 mr-2" />
+                Escanear con cámara
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -748,6 +823,76 @@ export default function StockPage() {
               <p className="text-sm text-gray-400">
                 {grabando ? 'Transcribiendo audio y analizando productos...' : 'Esto puede tomar unos momentos...'}
               </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de escáner de cámara */}
+      <Dialog open={escaneando} onOpenChange={cerrarEscaner}>
+        <DialogContent className="glass-card border-white/10 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-gradient">
+              📸 Escáner de Facturas
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {stream ? (
+              <div className="relative">
+                <video
+                  id="scanner-video"
+                  autoPlay
+                  playsInline
+                  muted
+                  ref={(video) => {
+                    if (video && stream) {
+                      video.srcObject = stream;
+                    }
+                  }}
+                  className="w-full rounded-lg bg-black"
+                  style={{ aspectRatio: '16/9' }}
+                />
+                
+                {/* Overlay con guías */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="w-full h-full border-2 border-dashed border-blue-400/50 rounded-lg flex items-center justify-center">
+                    <div className="text-center text-white bg-black/50 px-4 py-2 rounded-lg">
+                      <p className="text-sm font-medium">Posiciona la factura dentro del marco</p>
+                      <p className="text-xs text-gray-300">Asegúrate de que esté bien iluminada</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                <p className="ml-3 text-gray-400">Iniciando cámara...</p>
+              </div>
+            )}
+            
+            <div className="flex gap-3">
+              <Button 
+                onClick={capturarFactura}
+                disabled={!stream}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Capturar Factura
+              </Button>
+              
+              <Button 
+                onClick={cerrarEscaner}
+                variant="outline"
+                className="glass-button text-gray-300"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
+              </Button>
+            </div>
+            
+            <div className="text-xs text-gray-400 text-center">
+              💡 Consejo: Mantén la factura plana y bien iluminada para mejores resultados
             </div>
           </div>
         </DialogContent>
