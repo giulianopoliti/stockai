@@ -36,6 +36,20 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 === INICIANDO PROCESAMIENTO DE FACTURA ===');
     
+    // Verificación temprana de configuración
+    console.log('🔧 === VERIFICACIÓN DE CONFIGURACIÓN ===');
+    console.log('🔑 Google API Key:', process.env.GOOGLE_GENERATIVE_AI_API_KEY ? 'CONFIGURADA' : '❌ FALTANTE');
+    console.log('🌍 Entorno:', process.env.NODE_ENV);
+    console.log('📅 Timestamp:', new Date().toISOString());
+    
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      console.error('❌ GOOGLE_GENERATIVE_AI_API_KEY no está configurada');
+      return Response.json({ 
+        error: 'Configuración faltante: Google API Key no configurada en variables de entorno',
+        success: false 
+      }, { status: 500 });
+    }
+    
     const formData = await request.formData();
     const file = formData.get('file') as File;
     
@@ -262,12 +276,22 @@ CRITICAL: NO TERMINES hasta procesar TODAS las líneas visibles.`
     return Response.json(respuestaFinal);
 
   } catch (error) {
-    console.error('Error procesando factura:', error);
+    console.error('🚨 ERROR PROCESANDO FACTURA:', error);
+    console.error('🔍 Tipo de error:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('📝 Mensaje de error:', error instanceof Error ? error.message : String(error));
+    console.error('📊 Stack trace:', error instanceof Error ? error.stack : 'No stack available');
+    
+    // Verificar variables de entorno
+    console.error('🔑 GOOGLE_GENERATIVE_AI_API_KEY presente:', !!process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+    console.error('🔑 Primeros caracteres de la key:', process.env.GOOGLE_GENERATIVE_AI_API_KEY?.substring(0, 10) + '...');
     
     // Mensaje específico según tipo de archivo
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const esPDF = file?.type === 'application/pdf';
+    
+    console.error('📄 Tipo de archivo procesado:', file?.type);
+    console.error('📏 Tamaño del archivo:', file?.size, 'bytes');
     
     // Fallback con datos simulados
     const respuestaFallback = {
